@@ -1,0 +1,35 @@
+plugins {
+    id 'java'
+}
+
+apply plugin: "maven"
+
+sourceCompatibility = 1.11
+
+group 'net.christophschubert'
+version '0.1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+    mavenLocal()
+    maven {
+        url 'https://packages.confluent.io/maven'
+    }
+}
+
+dependencies {
+    compile group: 'org.apache.kafka', name: 'connect-api', version: '2.6.0'
+    compile group: 'org.apache.kafka', name: 'kafka-clients', version: '2.6.0'
+
+    compile group: 'io.confluent', name: 'kafka-avro-serializer', version: '6.0.0'
+
+    compile group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: '2.10.3'
+    compile group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: '2.10.3'
+
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.6.0'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine'
+}
+
+test {
+    useJUnitPlatform()
+}
