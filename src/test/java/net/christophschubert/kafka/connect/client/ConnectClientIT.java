@@ -62,5 +62,14 @@ class ConnectClientIT {
         //TODO: look into this: we need to provide a name on the same level as the other config values
         System.out.println(client.validateConfig("FileStreamSinkConnector", Map.of("topics", "file.contents"
                 , "file", "/tmp/test.sink.txt", "name", "file5", "connector.class", "org.apache.kafka.connect.file.FileStreamSinkConnector")));
+
+        System.out.println(client.getLogLevels());
+        System.out.println(client.getLogLevel("root"));
+    }
+
+    @Test
+    public void connectorStatusTest() throws IOException, InterruptedException {
+        ConnectClient client = new ConnectClient(baseURL);
+        System.out.println(client.getConnectorStatus("file3"));
     }
 }

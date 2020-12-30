@@ -9,7 +9,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.lang.reflect.Type;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -17,6 +16,7 @@ import java.net.http.HttpResponse;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public class ConnectClient {
 
@@ -24,20 +24,48 @@ public class ConnectClient {
     final static Logger logger = LoggerFactory.getLogger(ConnectClient.class);
 
     private final String baseUrl;
+    private final String adminUrl;
     private final HttpClient httpClient;
     private final ObjectMapper mapper = new ObjectMapper();
 
     public ConnectClient(String baseURL) {
         this.baseUrl = baseURL;
+        this.adminUrl = baseURL;
         this.httpClient = HttpClient.newBuilder().build();
     }
+
+    public ConnectClient(String baseURL, String adminUrl) {
+        this.baseUrl = baseURL;
+        this.adminUrl = adminUrl;
+        this.httpClient = HttpClient.newBuilder().build();
+    }
+
 
     HttpResponse<String> makeGetRequest(String endpoint) throws IOException, InterruptedException {
         return httpClient.send(prepare(endpoint), HttpResponse.BodyHandlers.ofString());
     }
 
+
+
     HttpRequest prepare(String endpoint) {
         return HttpRequest.newBuilder(URI.create(baseUrl + endpoint))
+                .header("Accept", "application/json")
+                .header("Content-Type", "application/json")
+                .build();
+    }
+
+
+
+    HttpRequest prepareAdmin(String endpoint) {
+        return HttpRequest.newBuilder(URI.create(adminUrl + endpoint))
+                .header("Accept", "application/json")
+                .header("Content-Type", "application/json")
+                .build();
+    }
+
+    HttpRequest prepareAdmin(String endpoint, String method, Object payload) throws JsonProcessingException {
+        return HttpRequest.newBuilder(URI.create(adminUrl + endpoint))
+                .method(method, HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(payload)))
                 .header("Accept", "application/json")
                 .header("Content-Type", "application/json")
                 .build();
@@ -179,10 +207,10 @@ public class ConnectClient {
      * @throws IOException
      * @throws InterruptedException
      */
-    public Map<String, Object> getConnectorStatus(String connectorName) throws IOException, InterruptedException {
+
+    public ConnectorStatus getConnectorStatus(String connectorName) throws IOException, InterruptedException {
         final var httpResponse = makeGetRequest(connectorsEp(connectorName, "status"));
-        //TODO: return properly structured object
-        return mapper.readValue(httpResponse.body(), Map.class);
+        return mapper.readValue(httpResponse.body(), ConnectorStatus.class);
     }
 
     /**
@@ -302,13 +330,42 @@ public class ConnectClient {
     }
 
 
-    //TODO: introduce proper class for this
+    //TODO: introduce proper class for this?
     public Map<String, Object> validateConfig(String connectorClassName, Map<String, String> config) throws IOException, InterruptedException {
         final String endpoint = String.format("/connector-plugins/%s/config/validate", connectorClassName);
         final var request = prepare(endpoint, "PUT", config);
         final var response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
         return mapper.readValue(response.body(), new TypeReference<Map<String, Object>>() {});
     }
-    //methods to deal with the admin and logging API
+
+    //admin/logging API
+    public Map<String, String> getLogLevels() throws IOException, InterruptedException {
+        final var request = prepareAdmin("/admin/loggers");
+        final var response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        final var rawResult = mapper.readValue(response.body(), new TypeReference<Map<String, Map<String, String>>>() {});
+
+        return rawResult.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().get("level")));
+    }
+
+    public String getLogLevel(String loggerName) throws IOException, InterruptedException {
+        final var request = prepareAdmin("/admin/loggers/" + loggerName);
+        final var response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        final var rawResult = mapper.readValue(response.body(), new TypeReference<Map<String, String>>() {});
+        return rawResult.get("level");
+    }
+
+    /**
+     *
+     * @param componentName can be either a logger or a connector class
+     * @param level the log-level of the connector
+     * @return a list of all updated loggers
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    public List<String> setLogLevel(String componentName, String level) throws IOException, InterruptedException {
+        final var request = prepareAdmin("/admin/loggers/" + componentName, "PUT", Map.of("level", level));
+        final var response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        return mapper.readValue(response.body(), new TypeReference<List<String>>() {});
+    }
 
 }
