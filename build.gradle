@@ -6,16 +6,46 @@ apply plugin: "maven"
 
 sourceCompatibility = 1.11
 
-group 'net.christophschubert'
-version '0.1.0-SNAPSHOT'
+group 'com.github.christophschubert'
+version '0.1.0'
+
+allprojects {
+    repositories {
+        maven { url 'https://jitpack.io' }
+    }
+}
 
 repositories {
     mavenCentral()
-    mavenLocal()
     maven {
         url 'https://packages.confluent.io/maven'
     }
 }
+
+
+sourceSets {
+    intTest {
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+}
+
+configurations {
+    intTestImplementation.extendsFrom implementation
+    intTestRuntimeOnly.extendsFrom runtimeOnly
+}
+
+task integrationTest(type: Test) {
+    description = "Runs integration tests"
+    group = 'verification'
+
+    testClassesDirs = sourceSets.intTest.output.classesDirs
+    classpath = sourceSets.intTest.runtimeClasspath
+    shouldRunAfter test
+}
+
+check.dependsOn integrationTest
+
 
 dependencies {
     compile group: 'org.apache.kafka', name: 'connect-api', version: '2.6.0'
@@ -33,8 +63,17 @@ dependencies {
 
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.6.0'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine'
+
+    intTestImplementation 'com.github.christophschubert:cp-testcontainers:v0.1.0'
+    intTestImplementation 'org.junit.jupiter:junit-jupiter-engine'
+
+    intTestImplementation "org.testcontainers:junit-jupiter:1.15.1"
 }
 
 test {
+    useJUnitPlatform()
+}
+
+integrationTest {
     useJUnitPlatform()
 }
